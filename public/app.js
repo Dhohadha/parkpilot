@@ -6,6 +6,7 @@ let currentLot = null;
 let activeSession = null;
 let timerInterval = null;
 let socket = null;
+let selectedBlock = 'A';
 
 document.addEventListener('DOMContentLoaded', async () => {
   initSocket();
@@ -96,6 +97,16 @@ function setupEventListeners() {
       fetchLotInfo();
     }
   });
+
+  const tabs = document.querySelectorAll('.block-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      selectedBlock = tab.getAttribute('data-block');
+      renderBlueprintGrid();
+    });
+  });
 }
 
 async function handleCheckIn() {
@@ -150,6 +161,18 @@ function displaySessionPass(data, triggerAutoDownload = false) {
   document.getElementById('passSessionId').innerText = data.session.sessionId;
   document.getElementById('currentFloorTag').innerText = `Floor: ${data.assignedSlot.floorName}`;
 
+  if (data.assignedSlot && data.assignedSlot.block) {
+    selectedBlock = data.assignedSlot.block;
+    const tabs = document.querySelectorAll('.block-tab');
+    tabs.forEach(tab => {
+      if (tab.getAttribute('data-block') === selectedBlock) {
+        tab.classList.add('active');
+      } else {
+        tab.classList.remove('active');
+      }
+    });
+  }
+
   const checkInDate = new Date(data.session.checkInTime);
   document.getElementById('passEntryTime').innerText = checkInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -171,9 +194,14 @@ function displaySessionPass(data, triggerAutoDownload = false) {
 
 
 function renderBlueprintGrid() {
-  if (!activeSession || !activeSession.blueprint) return;
+  if (!currentLot || !currentLot.floors) return;
 
-  const { gridRows, gridCols, slots, entrancePos, exitPos } = activeSession.blueprint;
+  const activeFloor = currentLot.floors.find(f => f.name.includes(`Block ${selectedBlock}`));
+  if (!activeFloor) return;
+
+  const { gridRows, gridCols, entrancePos, exitPos } = activeFloor;
+  const slots = activeFloor.slots || [];
+
   const gridContainer = document.getElementById('blueprintGrid');
   gridContainer.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
   gridContainer.innerHTML = '';
@@ -181,6 +209,29 @@ function renderBlueprintGrid() {
   const slotMap = new Map();
   slots.forEach(s => slotMap.set(`${s.row}_${s.col}`, s));
 
+  // Determine if we need to draw path directions
+  let path = null;
+  const isAssignedBlock = (activeSession && activeSession.assignedSlot && activeSession.assignedSlot.block === selectedBlock);
+
+  if (isAssignedBlock) {
+    const targetCell = {
+      row: activeSession.assignedSlot.row,
+      col: activeSession.assignedSlot.col
+    };
+    path = findPathBFS(gridRows, gridCols, entrancePos, targetCell, slotMap);
+  }
+
+  const pathMap = new Map();
+  if (path) {
+    for (let i = 0; i < path.length; i++) {
+      pathMap.set(`${path[i].row}_${path[i].col}`, {
+        index: i,
+        next: path[i + 1] || null
+      });
+    }
+  }
+
+  // Render the grid
   for (let r = 0; r < gridRows; r++) {
     for (let c = 0; c < gridCols; c++) {
       const cell = document.createElement('div');
@@ -196,21 +247,200 @@ function renderBlueprintGrid() {
         const slot = slotMap.get(key);
         cell.className = 'cell-slot';
 
-        const isUserSlot = (slot.slotNumber === activeSession.assignedSlot.slotNumber);
+        const isUserSlot = (activeSession && slot.slotNumber === activeSession.assignedSlot.slotNumber);
 
         if (isUserSlot) {
           cell.classList.add('status-Allocated');
           cell.innerHTML = `<i class="fa-solid fa-check"></i> ${slot.slotNumber}`;
         } else {
           cell.classList.add(`status-${slot.status}`);
-          cell.innerText = slot.slotNumber;
+          
+          let slotPrefix = '';
+          if (slot.slotType === 'VIP') {
+            slotPrefix = '<i class="fa-solid fa-wheelchair" style="margin-right:2px; font-size:9px; color:#3b82f6;"></i> ';
+          } else if (slot.slotType === 'EV') {
+            slotPrefix = '<i class="fa-solid fa-charging-station" style="margin-right:2px; font-size:9px; color:#10b981;"></i> ';
+          }
+          cell.innerHTML = `${slotPrefix}${slot.slotNumber}`;
         }
       } else {
         cell.className = 'cell-aisle';
+        if (pathMap.has(key)) {
+          cell.classList.add('path-active');
+          const pathInfo = pathMap.get(key);
+          const next = pathInfo.next;
+          if (next) {
+            if (next.row > r) cell.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
+            else if (next.row < r) cell.innerHTML = '<i class="fa-solid fa-arrow-up"></i>';
+            else if (next.col > c) cell.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
+            else if (next.col < c) cell.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+          }
+        }
       }
 
       gridContainer.appendChild(cell);
     }
+  }
+
+  // Display direction guidance
+  const directionsContainer = document.getElementById('directionsContainer');
+  const directionsSteps = document.getElementById('directionsSteps');
+  const directionsDistance = document.getElementById('directionsDistance');
+
+  if (activeSession && directionsContainer && directionsSteps) {
+    directionsContainer.classList.remove('hidden');
+
+    if (isAssignedBlock && path) {
+      directionsDistance.innerText = `${path.length - 1} steps (${((path.length - 1) * 2.5).toFixed(0)}m)`;
+      const steps = generateDirectionSteps(path);
+      directionsSteps.innerHTML = '';
+      
+      steps.forEach((step, index) => {
+        const stepEl = document.createElement('div');
+        stepEl.className = 'direction-step-item';
+
+        let icon = 'fa-arrow-right';
+        if (index === 0) icon = 'fa-door-open';
+        else if (index === steps.length - 1) icon = 'fa-square-parking';
+        else if (step.desc.includes('LEFT') || step.desc.includes('Left')) icon = 'fa-arrow-left';
+        else if (step.desc.includes('RIGHT') || step.desc.includes('Right')) icon = 'fa-arrow-right';
+        else if (step.desc.includes('UP') || step.desc.includes('up')) icon = 'fa-arrow-up';
+        else if (step.desc.includes('DOWN') || step.desc.includes('down') || step.desc.includes('ahead')) icon = 'fa-arrow-down';
+
+        stepEl.innerHTML = `
+          <div class="step-icon-box">
+            <i class="fa-solid ${icon}"></i>
+          </div>
+          <div class="step-text-box">
+            <span class="step-text-desc">${step.desc}</span>
+            <span class="step-text-sub">${step.sub}</span>
+          </div>
+        `;
+        directionsSteps.appendChild(stepEl);
+      });
+    } else {
+      directionsDistance.innerText = '';
+      directionsSteps.innerHTML = `
+        <div style="text-align: center; padding: 20px 10px; color: var(--text-muted); font-size: 13px; width: 100%;">
+          <i class="fa-solid fa-circle-info" style="font-size: 20px; color: var(--primary); margin-bottom: 8px; display: block;"></i>
+          Your assigned slot <strong>${activeSession.assignedSlot.slotNumber}</strong> is on <strong>${activeSession.assignedSlot.floorName}</strong>.<br>
+          <button class="btn-primary" style="margin-top: 12px; padding: 8px 16px; font-size: 12px; display: inline-flex;" id="btnSwitchToAssigned">
+            Switch to ${activeSession.assignedSlot.floorName} to view path
+          </button>
+        </div>
+      `;
+      document.getElementById('btnSwitchToAssigned').addEventListener('click', () => {
+        const assignedBlock = activeSession.assignedSlot.block;
+        const targetTab = document.querySelector(`.block-tab[data-block="${assignedBlock}"]`);
+        if (targetTab) targetTab.click();
+      });
+    }
+  } else {
+    if (directionsContainer) directionsContainer.classList.add('hidden');
+  }
+}
+
+function findPathBFS(gridRows, gridCols, start, target, slotMap) {
+  const queue = [[start]];
+  const visited = new Set();
+  visited.add(`${start.row}_${start.col}`);
+
+  while (queue.length > 0) {
+    const path = queue.shift();
+    const current = path[path.length - 1];
+
+    if (current.row === target.row && current.col === target.col) {
+      return path;
+    }
+
+    const directions = [
+      { r: -1, c: 0 },
+      { r: 1, c: 0 },
+      { r: 0, c: -1 },
+      { r: 0, c: 1 }
+    ];
+
+    for (const dir of directions) {
+      const nextRow = current.row + dir.r;
+      const nextCol = current.col + dir.c;
+      const key = `${nextRow}_${nextCol}`;
+
+      if (
+        nextRow >= 0 && nextRow < gridRows &&
+        nextCol >= 0 && nextCol < gridCols &&
+        !visited.has(key)
+      ) {
+        const isTarget = (nextRow === target.row && nextCol === target.col);
+        const isSlot = slotMap.has(key);
+
+        if (!isSlot || isTarget) {
+          visited.add(key);
+          queue.push([...path, { row: nextRow, col: nextCol }]);
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function generateDirectionSteps(path) {
+  if (!path || path.length < 2) return [];
+
+  const steps = [];
+  steps.push({
+    desc: "Enter the parking facility through the Entrance Gate.",
+    sub: "Drive slowly and follow the navigation arrows."
+  });
+
+  let currentDir = null; // 'UP', 'DOWN', 'LEFT', 'RIGHT'
+  let segmentLength = 0;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const curr = path[i];
+    const next = path[i+1];
+
+    let dir = '';
+    if (next.row > curr.row) dir = 'DOWN';
+    else if (next.row < curr.row) dir = 'UP';
+    else if (next.col > curr.col) dir = 'RIGHT';
+    else if (next.col < curr.col) dir = 'LEFT';
+
+    if (currentDir === null) {
+      currentDir = dir;
+      segmentLength = 1;
+    } else if (dir === currentDir) {
+      segmentLength++;
+    } else {
+      steps.push(getSegmentDescription(currentDir, segmentLength));
+      currentDir = dir;
+      segmentLength = 1;
+    }
+  }
+
+  if (currentDir !== null) {
+    steps.push(getSegmentDescription(currentDir, segmentLength));
+  }
+
+  steps.push({
+    desc: "Arrive at your assigned parking slot.",
+    sub: "Park your vehicle securely inside the designated lines."
+  });
+
+  return steps;
+}
+
+function getSegmentDescription(direction, length) {
+  const distance = (length * 2.5).toFixed(0); // 2.5 meters per grid cell
+  const unitsText = `${distance}m (${length} cells)`;
+  switch (direction) {
+    case 'DOWN':
+      return { desc: `Go straight ahead for ${unitsText}.`, sub: "Head straight down the driving aisle." };
+    case 'UP':
+      return { desc: `Go straight up for ${unitsText}.`, sub: "Drive straight up the aisle." };
+    case 'RIGHT':
+      return { desc: `Turn RIGHT and go straight for ${unitsText}.`, sub: "Follow the lane to the right." };
+    case 'LEFT':
+      return { desc: `Turn LEFT and go straight for ${unitsText}.`, sub: "Follow the lane to the left." };
   }
 }
 

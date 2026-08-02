@@ -10,7 +10,7 @@ async function allocateNearestSlot(lotId) {
   const candidateSlots = await ParkingSlot.find({
     lotId,
     status: 'Available'
-  }).sort({ distanceToEntrance: 1 }).limit(5);
+  }).sort({ block: 1, distanceToEntrance: 1 }).limit(5);
 
   if (!candidateSlots || candidateSlots.length === 0) {
     throw new Error('PARKING_FULL: All parking slots are currently occupied.');

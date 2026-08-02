@@ -143,16 +143,38 @@
           <span class="blueprint-floor-tag" id="currentFloorTag">Floor: B1</span>
         </div>
 
+        <!-- Block Selector Tabs -->
+        <div class="block-selector" id="blockSelector">
+          <button class="block-tab active" data-block="A">Block A (GF)</button>
+          <button class="block-tab" data-block="B">Block B (B1)</button>
+          <button class="block-tab" data-block="C">Block C (B2)</button>
+        </div>
+
         <!-- Map Legend -->
         <div class="blueprint-legend">
           <div class="leg-item"><span class="leg-box green"></span> Available</div>
           <div class="leg-item"><span class="leg-box red"></span> Occupied</div>
           <div class="leg-item"><span class="leg-box blue"></span> Your Slot</div>
+          <div class="leg-item"><span class="leg-box path"></span> Your Path</div>
         </div>
 
         <!-- Blueprint Grid Viewport -->
         <div class="blueprint-map-viewport">
           <div class="blueprint-grid" id="blueprintGrid"></div>
+        </div>
+      </section>
+
+      <!-- NAVIGATION DIRECTIONS SECTION -->
+      <section class="directions-section" id="directionsContainer">
+        <div class="directions-header">
+          <div class="directions-header-title">
+            <i class="fa-solid fa-diamond-turn-right"></i>
+            <h3>Navigation Directions</h3>
+          </div>
+          <span class="directions-distance" id="directionsDistance">-- steps</span>
+        </div>
+        <div class="directions-steps" id="directionsSteps">
+          <!-- Step items will be inserted dynamically -->
         </div>
       </section>
 

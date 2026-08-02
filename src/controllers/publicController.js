@@ -21,7 +21,11 @@ exports.getLotInfo = async (req, res) => {
       return res.status(404).json({ success: false, message: 'No active parking lot found. Please run seed script.' });
     }
 
-    const floors = await ParkingFloor.find({ lotId: lot._id }).sort({ floorNumber: 1 });
+    const floors = await ParkingFloor.find({ lotId: lot._id }).sort({ floorNumber: -1 }).lean();
+    for (const floor of floors) {
+      floor.slots = await ParkingSlot.find({ floorId: floor._id })
+        .select('slotNumber block slotType row col status distanceToEntrance');
+    }
 
     return res.json({
       success: true,
@@ -65,7 +69,7 @@ exports.checkIn = async (req, res) => {
 
     if (existingSession) {
       const floorSlots = await ParkingSlot.find({ floorId: existingSession.floorId._id })
-        .select('slotNumber slotType row col status distanceToEntrance');
+        .select('slotNumber block slotType row col status distanceToEntrance');
 
       return res.status(200).json({
         success: true,
@@ -85,6 +89,7 @@ exports.checkIn = async (req, res) => {
         assignedSlot: {
           id: existingSession.slotId._id,
           slotNumber: existingSession.slotId.slotNumber,
+          block: existingSession.slotId.block,
           slotType: existingSession.slotId.slotType,
           row: existingSession.slotId.row,
           col: existingSession.slotId.col,
@@ -131,7 +136,7 @@ exports.checkIn = async (req, res) => {
       metadata: { sessionId: session.sessionId, slotNumber: slot.slotNumber }
     });
 
-    const floorSlots = await ParkingSlot.find({ floorId: floor._id }).select('slotNumber slotType row col status distanceToEntrance');
+    const floorSlots = await ParkingSlot.find({ floorId: floor._id }).select('slotNumber block slotType row col status distanceToEntrance');
 
     socketService.broadcastSessionCreated(lot._id, {
       sessionId: session.sessionId,
@@ -159,6 +164,7 @@ exports.checkIn = async (req, res) => {
       assignedSlot: {
         id: slot._id,
         slotNumber: slot.slotNumber,
+        block: slot.block,
         slotType: slot.slotType,
         row: slot.row,
         col: slot.col,
@@ -185,14 +191,14 @@ exports.getSessionStatus = async (req, res) => {
     const session = await ParkingSession.findOne({ sessionId })
       .populate('lotId', 'name code address')
       .populate('floorId', 'name floorNumber gridRows gridCols entrancePos exitPos')
-      .populate('slotId', 'slotNumber slotType row col status');
+      .populate('slotId', 'slotNumber block slotType row col status');
 
     if (!session) {
       return res.status(404).json({ success: false, message: 'Parking session not found.' });
     }
 
     const floorSlots = await ParkingSlot.find({ floorId: session.floorId._id })
-      .select('slotNumber slotType row col status');
+      .select('slotNumber block slotType row col status');
 
     return res.json({
       success: true,
@@ -211,6 +217,7 @@ exports.getSessionStatus = async (req, res) => {
       assignedSlot: {
         id: session.slotId._id,
         slotNumber: session.slotId.slotNumber,
+        block: session.slotId.block,
         slotType: session.slotId.slotType,
         row: session.slotId.row,
         col: session.slotId.col,

@@ -16,9 +16,14 @@ const ParkingSlotSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  block: {
+    type: String,
+    enum: ['A', 'B', 'C'],
+    default: 'A'
+  },
   slotType: {
     type: String,
-    enum: ['Standard', 'VIP'],
+    enum: ['Standard', 'VIP', 'EV'],
     default: 'Standard'
   },
   row: {
@@ -48,5 +53,6 @@ const ParkingSlotSchema = new mongoose.Schema({
 });
 
 ParkingSlotSchema.index({ lotId: 1, status: 1, distanceToEntrance: 1 });
+ParkingSlotSchema.index({ lotId: 1, block: 1, status: 1, distanceToEntrance: 1 });
 
 module.exports = mongoose.model('ParkingSlot', ParkingSlotSchema);
