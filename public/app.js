@@ -208,7 +208,7 @@ function renderBlueprintGrid() {
   const slots = activeFloor.slots || [];
 
   const gridContainer = document.getElementById('blueprintGrid');
-  gridContainer.style.gridTemplateColumns = `repeat(${gridCols}, 1fr)`;
+  gridContainer.style.gridTemplateColumns = '1fr';
   gridContainer.innerHTML = '';
 
   const slotMap = new Map();
@@ -226,66 +226,228 @@ function renderBlueprintGrid() {
     path = findPathBFS(gridRows, gridCols, entrancePos, targetCell, slotMap);
   }
 
-  const pathMap = new Map();
-  if (path) {
-    for (let i = 0; i < path.length; i++) {
-      pathMap.set(`${path[i].row}_${path[i].col}`, {
-        index: i,
-        next: path[i + 1] || null
+  // Generate and insert high-fidelity architectural blueprint SVG
+  const svgContent = renderArchitecturalBlueprintSVG(gridRows, gridCols, entrancePos, exitPos, slotMap, activeSession, selectedBlock, path);
+  gridContainer.innerHTML = svgContent;
+
+  // Display direction guidance
+  const directionsContainer = document.getElementById('directionsContainer');
+  const directionsSteps = document.getElementById('directionsSteps');
+  const directionsDistance = document.getElementById('directionsDistance');
+
+  if (activeSession && directionsContainer && directionsSteps) {
+    directionsContainer.classList.remove('hidden');
+
+    if (isAssignedBlock && path) {
+      directionsDistance.innerText = `${path.length - 1} steps (${((path.length - 1) * 2.5).toFixed(0)}m)`;
+      const steps = generateDirectionSteps(path);
+      directionsSteps.innerHTML = '';
+      
+      steps.forEach((step, index) => {
+        const stepEl = document.createElement('div');
+        stepEl.className = 'direction-step-item';
+
+        let icon = 'fa-arrow-right';
+        if (index === 0) icon = 'fa-door-open';
+        else if (index === steps.length - 1) icon = 'fa-square-parking';
+        else if (step.desc.includes('LEFT') || step.desc.includes('Left')) icon = 'fa-arrow-left';
+        else if (step.desc.includes('RIGHT') || step.desc.includes('Right')) icon = 'fa-arrow-right';
+        else if (step.desc.includes('UP') || step.desc.includes('up')) icon = 'fa-arrow-up';
+        else if (step.desc.includes('DOWN') || step.desc.includes('down') || step.desc.includes('ahead')) icon = 'fa-arrow-down';
+
+        stepEl.innerHTML = `
+          <div class="step-icon-box">
+            <i class="fa-solid ${icon}"></i>
+          </div>
+          <div class="step-text-box">
+            <span class="step-text-desc">${step.desc}</span>
+            <span class="step-text-sub">${step.sub}</span>
+          </div>
+        `;
+        directionsSteps.appendChild(stepEl);
+      });
+    } else {
+      directionsDistance.innerText = '';
+      directionsSteps.innerHTML = `
+        <div style="text-align: center; padding: 20px 10px; color: var(--text-muted); font-size: 13px; width: 100%;">
+          <i class="fa-solid fa-circle-info" style="font-size: 20px; color: var(--primary); margin-bottom: 8px; display: block;"></i>
+          Your assigned slot <strong>${activeSession.assignedSlot.slotNumber}</strong> is on <strong>${activeSession.assignedSlot.floorName}</strong>.<br>
+          <button class="btn-primary" style="margin-top: 12px; padding: 8px 16px; font-size: 12px; display: inline-flex;" id="btnSwitchToAssigned">
+            Switch to ${activeSession.assignedSlot.floorName} to view path
+          </button>
+        </div>
+      `;
+      document.getElementById('btnSwitchToAssigned').addEventListener('click', () => {
+        const assignedBlock = activeSession.assignedSlot.block;
+        const targetTab = document.querySelector(`.block-tab[data-block="${assignedBlock}"]`);
+        if (targetTab) targetTab.click();
       });
     }
+  } else {
+    if (directionsContainer) directionsContainer.classList.add('hidden');
   }
+}
 
-  // Render the grid
+function renderArchitecturalBlueprintSVG(gridRows, gridCols, entrancePos, exitPos, slotMap, activeSession, selectedBlock, path) {
+  const cellW = 50;
+  const cellH = 50;
+  const svgWidth = gridCols * cellW; // 900
+  const svgHeight = gridRows * cellH; // 500
+
+  let svgHtml = `
+    <svg viewBox="0 0 ${svgWidth} ${svgHeight}" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg" style="background:#2b3e50; border-radius:12px; font-family: sans-serif;">
+      <defs>
+        <!-- Blueprint Grid Pattern -->
+        <pattern id="blueprintGridPattern" width="25" height="25" patternUnits="userSpaceOnUse">
+          <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#ffffff" stroke-width="0.5" stroke-opacity="0.08"/>
+        </pattern>
+        <!-- Glowing Route Animation Filter -->
+        <filter id="routeGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      <!-- Background Grid -->
+      <rect width="${svgWidth}" height="${svgHeight}" fill="#2b3e50" rx="12"/>
+      <rect width="${svgWidth}" height="${svgHeight}" fill="url(#blueprintGridPattern)" />
+
+      <!-- Outer Blueprint Border -->
+      <rect x="2" y="2" width="${svgWidth - 4}" height="${svgHeight - 4}" fill="none" stroke="#ffffff" stroke-opacity="0.2" stroke-width="2" rx="10"/>
+
+      <!-- LEFT RAMPS SECTION -->
+      <g opacity="0.85">
+        <path d="M 10 120 C 10 30, 30 10, 120 10 L 240 10 L 240 50 L 120 50 C 60 50, 50 60, 50 120 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+        <text x="120" y="32" fill="#ffffff" font-size="10" font-weight="bold" letter-spacing="1">RAMP UP TO P3 ➔</text>
+        
+        <path d="M 50 140 C 50 80, 80 55, 140 55 L 240 55 L 240 90 L 140 90 C 90 90, 80 100, 80 140 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+        <text x="135" y="76" fill="#ffffff" font-size="9" font-weight="bold" letter-spacing="1">RAMP UP TO P1 ➔</text>
+
+        <path d="M 10 380 C 10 470, 30 490, 120 490 L 240 490 L 240 450 L 120 450 C 60 450, 50 440, 50 380 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+        <text x="110" y="474" fill="#ffffff" font-size="9" font-weight="bold" letter-spacing="1">RAMP DOWN TO B3 ➔</text>
+      </g>
+
+      <!-- TOP MALL ENTRANCE & ELEVATORS LOBBY -->
+      <g>
+        <rect x="250" y="6" width="220" height="74" fill="#3c556e" stroke="#ffffff" stroke-width="1.5" rx="6"/>
+        <rect x="360" y="10" width="100" height="30" fill="#2b3e50" stroke="#ffffff" stroke-opacity="0.4" rx="4"/>
+        <text x="410" y="29" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">LOBBY</text>
+        
+        <rect x="370" y="44" width="22" height="22" fill="#1e2b37" stroke="#10b981" rx="3"/>
+        <text x="381" y="59" fill="#10b981" font-size="12" text-anchor="middle">🛗</text>
+        <rect x="398" y="44" width="22" height="22" fill="#1e2b37" stroke="#10b981" rx="3"/>
+        <text x="409" y="59" fill="#10b981" font-size="12" text-anchor="middle">🛗</text>
+        
+        <text x="260" y="32" fill="#ffffff" font-size="10" font-weight="bold">MALL ENTRANCE</text>
+        <text x="260" y="46" fill="#10b981" font-size="9" font-weight="bold">& ELEVATORS</text>
+      </g>
+
+      <!-- VEHICLE ENTRY & EXIT MARKS -->
+      <g font-size="11" font-weight="bold" fill="#ffffff">
+        <rect x="0" y="235" width="40" height="30" fill="#10b981" rx="4"/>
+        <text x="20" y="254" text-anchor="middle" fill="#ffffff">IN ◄</text>
+        
+        <rect x="860" y="235" width="40" height="30" fill="#ef4444" rx="4"/>
+        <text x="880" y="254" text-anchor="middle" fill="#ffffff">OUT ►</text>
+      </g>
+
+      <!-- TRAFFIC FLOW ARROWS ON LANES -->
+      <g fill="#ffffff" opacity="0.35">
+        <path d="M 280 92 L 295 97 L 280 102 Z" />
+        <path d="M 450 92 L 465 97 L 450 102 Z" />
+        <path d="M 620 92 L 635 97 L 620 102 Z" />
+        <path d="M 780 92 L 795 97 L 780 102 Z" />
+
+        <path d="M 790 442 L 775 447 L 790 452 Z" />
+        <path d="M 620 442 L 605 447 L 620 452 Z" />
+        <path d="M 450 442 L 435 447 L 450 452 Z" />
+        <path d="M 280 442 L 265 447 L 280 452 Z" />
+      </g>
+  `;
+
+  // DRAW PARKING SLOTS
   for (let r = 0; r < gridRows; r++) {
     for (let c = 0; c < gridCols; c++) {
-      const cell = document.createElement('div');
       const key = `${r}_${c}`;
-
-      if (r === entrancePos.row && c === entrancePos.col) {
-        cell.className = 'cell-gate';
-        cell.innerHTML = '<i class="fa-solid fa-door-open"></i> IN';
-      } else if (r === exitPos.row && c === exitPos.col) {
-        cell.className = 'cell-gate';
-        cell.innerHTML = 'OUT <i class="fa-solid fa-right-from-bracket"></i>';
-      } else if (slotMap.has(key)) {
+      if (slotMap.has(key)) {
         const slot = slotMap.get(key);
-        cell.className = 'cell-slot';
+        const x = c * cellW + 2;
+        const y = r * cellH + 2;
+        const w = cellW - 4;
+        const h = cellH - 4;
 
         const isUserSlot = (activeSession && slot.slotNumber === activeSession.assignedSlot.slotNumber);
 
-        if (isUserSlot) {
-          cell.classList.add('status-Allocated');
-          cell.innerHTML = `<i class="fa-solid fa-check"></i> ${slot.slotNumber}`;
-        } else {
-          cell.classList.add(`status-${slot.status}`);
-          
-          let slotPrefix = '';
-          if (slot.slotType === 'VIP') {
-            slotPrefix = '<i class="fa-solid fa-wheelchair" style="margin-right:2px; font-size:9px; color:#3b82f6;"></i> ';
-          } else if (slot.slotType === 'EV') {
-            slotPrefix = '<i class="fa-solid fa-charging-station" style="margin-right:2px; font-size:9px; color:#10b981;"></i> ';
-          }
-          cell.innerHTML = `${slotPrefix}${slot.slotNumber}`;
-        }
-      } else {
-        cell.className = 'cell-aisle';
-        if (pathMap.has(key)) {
-          cell.classList.add('path-active');
-          const pathInfo = pathMap.get(key);
-          const next = pathInfo.next;
-          if (next) {
-            if (next.row > r) cell.innerHTML = '<i class="fa-solid fa-arrow-down"></i>';
-            else if (next.row < r) cell.innerHTML = '<i class="fa-solid fa-arrow-up"></i>';
-            else if (next.col > c) cell.innerHTML = '<i class="fa-solid fa-arrow-right"></i>';
-            else if (next.col < c) cell.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
-          }
-        }
-      }
+        let bg = '#1e2b37';
+        let stroke = '#ffffff';
+        let strokeOpacity = '0.3';
+        let textColor = '#ffffff';
 
-      gridContainer.appendChild(cell);
+        if (isUserSlot) {
+          bg = '#2563eb';
+          stroke = '#60a5fa';
+          strokeOpacity = '1';
+          textColor = '#ffffff';
+        } else if (slot.status === 'Available') {
+          bg = '#064e3b';
+          stroke = '#10b981';
+          strokeOpacity = '0.8';
+          textColor = '#34d399';
+        } else if (slot.status === 'Occupied') {
+          bg = '#7f1d1d';
+          stroke = '#ef4444';
+          strokeOpacity = '0.8';
+          textColor = '#fca5a5';
+        }
+
+        let iconSymbol = '';
+        if (slot.slotType === 'VIP') {
+          iconSymbol = '<tspan fill="#60a5fa"> ♿</tspan>';
+        } else if (slot.slotType === 'EV') {
+          iconSymbol = '<tspan fill="#34d399"> ⚡</tspan>';
+        }
+
+        svgHtml += `
+          <g style="cursor:pointer;">
+            <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${bg}" stroke="${stroke}" stroke-opacity="${strokeOpacity}" stroke-width="${isUserSlot ? 2 : 1}" rx="4"/>
+            <text x="${x + w/2}" y="${y + h/2 + 4}" fill="${textColor}" font-size="${isUserSlot ? 10 : 9}" font-weight="bold" text-anchor="middle">
+              ${slot.slotNumber}${iconSymbol}
+            </text>
+          </g>
+        `;
+      }
     }
   }
+
+  // DRAW ANIMATED GPS ROUTE PATH
+  if (path && path.length > 1) {
+    let pathD = '';
+    path.forEach((pt, i) => {
+      const cx = pt.col * cellW + cellW / 2;
+      const cy = pt.row * cellH + cellH / 2;
+      pathD += (i === 0 ? `M ${cx} ${cy}` : ` L ${cx} ${cy}`);
+    });
+
+    svgHtml += `
+      <path d="${pathD}" fill="none" stroke="#f97316" stroke-width="5" stroke-dasharray="10 6" stroke-linecap="round" stroke-linejoin="round" class="gps-route-line" filter="url(#routeGlow)"/>
+    `;
+
+    const targetPt = path[path.length - 1];
+    const tx = targetPt.col * cellW + cellW / 2;
+    const ty = targetPt.row * cellH + cellH / 2;
+
+    svgHtml += `
+      <circle cx="${tx}" cy="${ty}" r="12" fill="#f97316" fill-opacity="0.3" stroke="#f97316" stroke-width="2">
+        <animate attributeName="r" values="8;16;8" dur="1.5s" repeatCount="indefinite" />
+        <animate attributeName="fill-opacity" values="0.6;0.1;0.6" dur="1.5s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="${tx}" cy="${ty}" r="5" fill="#ffffff" />
+    `;
+  }
+
+  svgHtml += `</svg>`;
+  return svgHtml;
+}
 
   // Display direction guidance
   const directionsContainer = document.getElementById('directionsContainer');

@@ -503,6 +503,19 @@ body {
   min-width: 300px;
 }
 
+@keyframes gpsFlow {
+  from {
+    stroke-dashoffset: 32;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.gps-route-line {
+  animation: gpsFlow 1.2s linear infinite;
+}
+
 .cell-slot {
   background: #ffffff;
   border: 1px solid var(--border-light);
