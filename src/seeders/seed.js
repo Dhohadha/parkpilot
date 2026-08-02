@@ -28,7 +28,7 @@ async function seedData() {
       code: 'MAIN-01',
       name: 'The Grand Multiplex Mall',
       address: '100 Central Mall Avenue, Tech District',
-      totalSlots: 252,
+      totalSlots: 240,
       occupiedSlots: 0
     });
 
@@ -41,7 +41,7 @@ async function seedData() {
       gridCols: 18,
       entrancePos: { row: 5, col: 0 },
       exitPos: { row: 5, col: 17 },
-      totalSlots: 84
+      totalSlots: 80
     });
 
     const basementB1 = await ParkingFloor.create({
@@ -52,7 +52,7 @@ async function seedData() {
       gridCols: 18,
       entrancePos: { row: 5, col: 0 },
       exitPos: { row: 5, col: 17 },
-      totalSlots: 84
+      totalSlots: 80
     });
 
     const basementB2 = await ParkingFloor.create({
@@ -63,7 +63,7 @@ async function seedData() {
       gridCols: 18,
       entrancePos: { row: 5, col: 0 },
       exitPos: { row: 5, col: 17 },
-      totalSlots: 84
+      totalSlots: 80
     });
 
     console.log('[Seeder] Creating uniform parking slots grid layout...');
@@ -76,12 +76,12 @@ async function seedData() {
           let isSlot = false;
           let slotType = 'Standard';
 
-          // 1. Top perimeter slots
-          if (r === 0 && c >= 6 && c <= 16) {
+          // 1. Top perimeter slots (Cols 9 to 16, avoiding Lobby & Ramps at Cols 0-8)
+          if (r === 0 && c >= 9 && c <= 16) {
             isSlot = true;
           }
-          // 2. Bottom perimeter slots
-          else if (r === 9 && c >= 3 && c <= 15) {
+          // 2. Bottom perimeter slots (Cols 4 to 15, avoiding Bottom Ramp at Cols 0-3)
+          else if (r === 9 && c >= 4 && c <= 15) {
             isSlot = true;
           }
           // 3. Left vertical slots
@@ -120,7 +120,6 @@ async function seedData() {
 
           if (!isSlot) continue;
 
-          // Format slot number nicely, e.g. A-01, B-45
           const slotNumStr = `${blockLetter}-${slotIndex < 10 ? '0' + slotIndex : slotIndex}`;
           const dist = Math.sqrt(Math.pow(r - floor.entrancePos.row, 2) + Math.pow(c - floor.entrancePos.col, 2));
 

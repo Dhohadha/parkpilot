@@ -317,29 +317,29 @@ function renderArchitecturalBlueprintSVG(gridRows, gridCols, entrancePos, exitPo
 
       <!-- LEFT RAMPS SECTION -->
       <g opacity="0.85">
-        <path d="M 10 120 C 10 30, 30 10, 120 10 L 240 10 L 240 50 L 120 50 C 60 50, 50 60, 50 120 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
-        <text x="120" y="32" fill="#ffffff" font-size="10" font-weight="bold" letter-spacing="1">RAMP UP TO P3 ➔</text>
+        <path d="M 10 95 C 10 25, 25 10, 95 10 L 185 10 L 185 45 L 95 45 C 50 45, 45 50, 45 95 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+        <text x="95" y="30" fill="#ffffff" font-size="9" font-weight="bold" letter-spacing="1">RAMP UP TO P3 ➔</text>
         
-        <path d="M 50 140 C 50 80, 80 55, 140 55 L 240 55 L 240 90 L 140 90 C 90 90, 80 100, 80 140 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
-        <text x="135" y="76" fill="#ffffff" font-size="9" font-weight="bold" letter-spacing="1">RAMP UP TO P1 ➔</text>
+        <path d="M 45 95 C 45 60, 60 48, 110 48 L 185 48 L 185 85 L 110 85 C 75 85, 70 90, 70 95 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+        <text x="115" y="70" fill="#ffffff" font-size="8.5" font-weight="bold" letter-spacing="1">RAMP UP TO P1 ➔</text>
 
-        <path d="M 10 380 C 10 470, 30 490, 120 490 L 240 490 L 240 450 L 120 450 C 60 450, 50 440, 50 380 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
-        <text x="110" y="474" fill="#ffffff" font-size="9" font-weight="bold" letter-spacing="1">RAMP DOWN TO B3 ➔</text>
+        <path d="M 10 405 C 10 475, 25 490, 95 490 L 185 490 L 185 455 L 95 455 C 50 455, 45 450, 45 405 Z" fill="#1e2b37" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+        <text x="90" y="474" fill="#ffffff" font-size="8.5" font-weight="bold" letter-spacing="1">RAMP DOWN TO B3 ➔</text>
       </g>
 
-      <!-- TOP MALL ENTRANCE & ELEVATORS LOBBY -->
+      <!-- TOP MALL ENTRANCE & ELEVATORS LOBBY (Cols 4-8, Row 0) -->
       <g>
-        <rect x="250" y="6" width="220" height="74" fill="#3c556e" stroke="#ffffff" stroke-width="1.5" rx="6"/>
-        <rect x="360" y="10" width="100" height="30" fill="#2b3e50" stroke="#ffffff" stroke-opacity="0.4" rx="4"/>
-        <text x="410" y="29" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">LOBBY</text>
+        <rect x="202" y="4" width="236" height="42" fill="#3c556e" stroke="#ffffff" stroke-width="1.5" rx="6"/>
+        <rect x="345" y="8" width="85" height="34" fill="#2b3e50" stroke="#ffffff" stroke-opacity="0.4" rx="4"/>
+        <text x="387" y="22" fill="#ffffff" font-size="8.5" font-weight="bold" text-anchor="middle">LOBBY</text>
         
-        <rect x="370" y="44" width="22" height="22" fill="#1e2b37" stroke="#10b981" rx="3"/>
-        <text x="381" y="59" fill="#10b981" font-size="12" text-anchor="middle">🛗</text>
-        <rect x="398" y="44" width="22" height="22" fill="#1e2b37" stroke="#10b981" rx="3"/>
-        <text x="409" y="59" fill="#10b981" font-size="12" text-anchor="middle">🛗</text>
+        <rect x="353" y="27" width="13" height="12" fill="#1e2b37" stroke="#10b981" rx="2"/>
+        <text x="359" y="36" fill="#10b981" font-size="8" text-anchor="middle">🛗</text>
+        <rect x="371" y="27" width="13" height="12" fill="#1e2b37" stroke="#10b981" rx="2"/>
+        <text x="377" y="36" fill="#10b981" font-size="8" text-anchor="middle">🛗</text>
         
-        <text x="260" y="32" fill="#ffffff" font-size="10" font-weight="bold">MALL ENTRANCE</text>
-        <text x="260" y="46" fill="#10b981" font-size="9" font-weight="bold">& ELEVATORS</text>
+        <text x="210" y="22" fill="#ffffff" font-size="9" font-weight="bold">MALL ENTRANCE</text>
+        <text x="210" y="34" fill="#10b981" font-size="8.5" font-weight="bold">& ELEVATORS</text>
       </g>
 
       <!-- VEHICLE ENTRY & EXIT MARKS -->
@@ -353,15 +353,15 @@ function renderArchitecturalBlueprintSVG(gridRows, gridCols, entrancePos, exitPo
 
       <!-- TRAFFIC FLOW ARROWS ON LANES -->
       <g fill="#ffffff" opacity="0.35">
-        <path d="M 280 92 L 295 97 L 280 102 Z" />
-        <path d="M 450 92 L 465 97 L 450 102 Z" />
-        <path d="M 620 92 L 635 97 L 620 102 Z" />
-        <path d="M 780 92 L 795 97 L 780 102 Z" />
+        <path d="M 280 72 L 295 77 L 280 82 Z" />
+        <path d="M 450 72 L 465 77 L 450 82 Z" />
+        <path d="M 620 72 L 635 77 L 620 82 Z" />
+        <path d="M 780 72 L 795 77 L 780 82 Z" />
 
-        <path d="M 790 442 L 775 447 L 790 452 Z" />
-        <path d="M 620 442 L 605 447 L 620 452 Z" />
-        <path d="M 450 442 L 435 447 L 450 452 Z" />
-        <path d="M 280 442 L 265 447 L 280 452 Z" />
+        <path d="M 790 422 L 775 427 L 790 432 Z" />
+        <path d="M 620 422 L 605 427 L 620 432 Z" />
+        <path d="M 450 422 L 435 427 L 450 432 Z" />
+        <path d="M 280 422 L 265 427 L 280 432 Z" />
       </g>
   `;
 
