@@ -44,6 +44,7 @@ exports.getLotInfo = async (req, res) => {
 exports.checkIn = async (req, res) => {
   try {
     const { lotCode = 'MAIN-01', vehicleNumber = 'SPARK-2026' } = req.body;
+    const formattedVehicle = vehicleNumber.toUpperCase().trim();
 
     let lot = await ParkingLot.findOne({ code: lotCode.toUpperCase() });
     if (!lot) {
@@ -54,6 +55,52 @@ exports.checkIn = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Parking lot not found.' });
     }
 
+    // SAFEGUARD: Check if vehicle already has an ACTIVE parking session (Prevent duplicate slot reservation)
+    const existingSession = await ParkingSession.findOne({
+      vehicleNumber: formattedVehicle,
+      status: 'Active'
+    })
+    .populate('floorId')
+    .populate('slotId');
+
+    if (existingSession) {
+      const floorSlots = await ParkingSlot.find({ floorId: existingSession.floorId._id })
+        .select('slotNumber slotType row col status distanceToEntrance');
+
+      return res.status(200).json({
+        success: true,
+        isExisting: true,
+        message: `ACTIVE_SESSION_RESTORED: Vehicle ${formattedVehicle} already has slot ${existingSession.slotId.slotNumber}.`,
+        session: {
+          sessionId: existingSession.sessionId,
+          vehicleNumber: existingSession.vehicleNumber,
+          checkInTime: existingSession.checkInTime,
+          qrToken: existingSession.qrToken
+        },
+        lot: {
+          code: lot.code,
+          name: lot.name
+        },
+        assignedSlot: {
+          id: existingSession.slotId._id,
+          slotNumber: existingSession.slotId.slotNumber,
+          slotType: existingSession.slotId.slotType,
+          row: existingSession.slotId.row,
+          col: existingSession.slotId.col,
+          floorName: existingSession.floorId.name,
+          floorNumber: existingSession.floorId.floorNumber
+        },
+        blueprint: {
+          gridRows: existingSession.floorId.gridRows,
+          gridCols: existingSession.floorId.gridCols,
+          entrancePos: existingSession.floorId.entrancePos,
+          exitPos: existingSession.floorId.exitPos,
+          slots: floorSlots
+        }
+      });
+    }
+
+    // Allocate new nearest available slot
     const slot = await allocationService.allocateNearestSlot(lot._id);
     const floor = await ParkingFloor.findById(slot.floorId);
 
@@ -65,7 +112,7 @@ exports.checkIn = async (req, res) => {
       lotId: lot._id,
       floorId: floor._id,
       slotId: slot._id,
-      vehicleNumber: vehicleNumber.toUpperCase().trim(),
+      vehicleNumber: formattedVehicle,
       qrToken: token,
       qrSignature: signature,
       checkInTime: new Date(),
@@ -95,6 +142,7 @@ exports.checkIn = async (req, res) => {
 
     return res.status(201).json({
       success: true,
+      isExisting: false,
       message: 'Parking slot successfully allocated!',
       session: {
         sessionId: session.sessionId,
@@ -146,7 +194,26 @@ exports.getSessionStatus = async (req, res) => {
 
     return res.json({
       success: true,
-      session,
+      session: {
+        sessionId: session.sessionId,
+        vehicleNumber: session.vehicleNumber,
+        checkInTime: session.checkInTime,
+        qrToken: session.qrToken,
+        status: session.status
+      },
+      lot: {
+        code: session.lotId.code,
+        name: session.lotId.name
+      },
+      assignedSlot: {
+        id: session.slotId._id,
+        slotNumber: session.slotId.slotNumber,
+        slotType: session.slotId.slotType,
+        row: session.slotId.row,
+        col: session.slotId.col,
+        floorName: session.floorId.name,
+        floorNumber: session.floorId.floorNumber
+      },
       blueprint: {
         gridRows: session.floorId.gridRows,
         gridCols: session.floorId.gridCols,

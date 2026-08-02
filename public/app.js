@@ -1,5 +1,5 @@
 /* ==========================================================================
-   PARKPILOT - CLEAN LIGHT PUBLIC WEB APP LOGIC & EXIT PASS GENERATOR
+   PARKPILOT - CLEAN LIGHT PUBLIC WEB APP LOGIC & SESSION PERSISTENCE
    ========================================================================== */
 
 let currentLot = null;
@@ -7,10 +7,11 @@ let activeSession = null;
 let timerInterval = null;
 let socket = null;
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initSocket();
-  fetchLotInfo();
+  await fetchLotInfo();
   setupEventListeners();
+  checkPersistedSession();
 });
 
 function initSocket() {
@@ -26,6 +27,14 @@ function initSocket() {
       activeSession.assignedSlot.status = slotData.status;
     }
     renderBlueprintGrid();
+  });
+
+  socket.on('session:completed', (data) => {
+    if (activeSession && data.sessionId === activeSession.session.sessionId) {
+      localStorage.removeItem('parkpilot_active_session');
+      alert('Your parking session has been completed by security gate exit. Slot released.');
+      location.reload();
+    }
   });
 }
 
@@ -49,6 +58,26 @@ async function fetchLotInfo() {
   }
 }
 
+// SAFEGUARD: Check & Restore Active Session on Page Refresh / Re-open
+async function checkPersistedSession() {
+  const savedSessionId = localStorage.getItem('parkpilot_active_session');
+  if (!savedSessionId) return;
+
+  try {
+    const res = await fetch(`/api/public/session/${savedSessionId}`);
+    const data = await res.json();
+
+    if (data.success && data.session && data.session.status === 'Active') {
+      console.log('[Session Persistence] Restoring active parking session:', savedSessionId);
+      displaySessionPass(data, false); // Restore view without auto-downloading again on refresh
+    } else {
+      localStorage.removeItem('parkpilot_active_session');
+    }
+  } catch (e) {
+    console.error('Error checking persisted session:', e);
+  }
+}
+
 function setupEventListeners() {
   document.getElementById('btnCheckIn').addEventListener('click', handleCheckIn);
   document.getElementById('btnDownloadPass').addEventListener('click', () => downloadPassPNG());
@@ -58,11 +87,14 @@ function setupEventListeners() {
   });
 
   document.getElementById('btnNewCheckIn').addEventListener('click', () => {
-    if (timerInterval) clearInterval(timerInterval);
-    activeSession = null;
-    document.getElementById('stepPassView').classList.remove('active');
-    document.getElementById('stepCheckIn').classList.add('active');
-    fetchLotInfo();
+    if (confirm('Start a new check-in? Make sure your current vehicle has checked out.')) {
+      if (timerInterval) clearInterval(timerInterval);
+      localStorage.removeItem('parkpilot_active_session');
+      activeSession = null;
+      document.getElementById('stepPassView').classList.remove('active');
+      document.getElementById('stepCheckIn').classList.add('active');
+      fetchLotInfo();
+    }
   });
 }
 
@@ -91,30 +123,11 @@ async function handleCheckIn() {
       throw new Error(data.message);
     }
 
-    activeSession = data;
+    // Save Session ID to Local Storage to prevent duplicate allocations on page refresh
+    localStorage.setItem('parkpilot_active_session', data.session.sessionId);
 
-    document.getElementById('stepCheckIn').classList.remove('active');
-    document.getElementById('stepPassView').classList.add('active');
-
-    document.getElementById('passSlotNum').innerText = data.assignedSlot.slotNumber;
-    document.getElementById('passFloorNum').innerText = data.assignedSlot.floorName;
-    document.getElementById('passVehicle').innerText = data.session.vehicleNumber;
-    document.getElementById('passSessionId').innerText = data.session.sessionId;
-    document.getElementById('currentFloorTag').innerText = `Floor: ${data.assignedSlot.floorName}`;
-
-    const checkInDate = new Date(data.session.checkInTime);
-    document.getElementById('passEntryTime').innerText = checkInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    // Render Exit Pass QR Code
-    generateExitPassQR(data.session.qrToken);
-
-    startLiveTimer(checkInDate);
-    renderBlueprintGrid();
-
-    // AUTO-DOWNLOAD PARKING PASS PNG IMMEDIATELY ON ALLOCATION!
-    setTimeout(() => {
-      downloadPassPNG();
-    }, 400);
+    // Display session pass & auto-download PNG pass
+    displaySessionPass(data, true);
 
   } catch (error) {
     errBox.innerText = error.message;
@@ -122,6 +135,34 @@ async function handleCheckIn() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = '<span>Allocate Nearest Available Slot</span> <i class="fa-solid fa-arrow-right"></i>';
+  }
+}
+
+function displaySessionPass(data, triggerAutoDownload = false) {
+  activeSession = data;
+
+  document.getElementById('stepCheckIn').classList.remove('active');
+  document.getElementById('stepPassView').classList.add('active');
+
+  document.getElementById('passSlotNum').innerText = data.assignedSlot.slotNumber;
+  document.getElementById('passFloorNum').innerText = data.assignedSlot.floorName;
+  document.getElementById('passVehicle').innerText = data.session.vehicleNumber;
+  document.getElementById('passSessionId').innerText = data.session.sessionId;
+  document.getElementById('currentFloorTag').innerText = `Floor: ${data.assignedSlot.floorName}`;
+
+  const checkInDate = new Date(data.session.checkInTime);
+  document.getElementById('passEntryTime').innerText = checkInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Render Exit Pass QR Code
+  generateExitPassQR(data.session.qrToken);
+
+  startLiveTimer(checkInDate);
+  renderBlueprintGrid();
+
+  if (triggerAutoDownload) {
+    setTimeout(() => {
+      downloadPassPNG();
+    }, 400);
   }
 }
 
