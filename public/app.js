@@ -449,64 +449,6 @@ function renderArchitecturalBlueprintSVG(gridRows, gridCols, entrancePos, exitPo
   return svgHtml;
 }
 
-  // Display direction guidance
-  const directionsContainer = document.getElementById('directionsContainer');
-  const directionsSteps = document.getElementById('directionsSteps');
-  const directionsDistance = document.getElementById('directionsDistance');
-
-  if (activeSession && directionsContainer && directionsSteps) {
-    directionsContainer.classList.remove('hidden');
-
-    if (isAssignedBlock && path) {
-      directionsDistance.innerText = `${path.length - 1} steps (${((path.length - 1) * 2.5).toFixed(0)}m)`;
-      const steps = generateDirectionSteps(path);
-      directionsSteps.innerHTML = '';
-      
-      steps.forEach((step, index) => {
-        const stepEl = document.createElement('div');
-        stepEl.className = 'direction-step-item';
-
-        let icon = 'fa-arrow-right';
-        if (index === 0) icon = 'fa-door-open';
-        else if (index === steps.length - 1) icon = 'fa-square-parking';
-        else if (step.desc.includes('LEFT') || step.desc.includes('Left')) icon = 'fa-arrow-left';
-        else if (step.desc.includes('RIGHT') || step.desc.includes('Right')) icon = 'fa-arrow-right';
-        else if (step.desc.includes('UP') || step.desc.includes('up')) icon = 'fa-arrow-up';
-        else if (step.desc.includes('DOWN') || step.desc.includes('down') || step.desc.includes('ahead')) icon = 'fa-arrow-down';
-
-        stepEl.innerHTML = `
-          <div class="step-icon-box">
-            <i class="fa-solid ${icon}"></i>
-          </div>
-          <div class="step-text-box">
-            <span class="step-text-desc">${step.desc}</span>
-            <span class="step-text-sub">${step.sub}</span>
-          </div>
-        `;
-        directionsSteps.appendChild(stepEl);
-      });
-    } else {
-      directionsDistance.innerText = '';
-      directionsSteps.innerHTML = `
-        <div style="text-align: center; padding: 20px 10px; color: var(--text-muted); font-size: 13px; width: 100%;">
-          <i class="fa-solid fa-circle-info" style="font-size: 20px; color: var(--primary); margin-bottom: 8px; display: block;"></i>
-          Your assigned slot <strong>${activeSession.assignedSlot.slotNumber}</strong> is on <strong>${activeSession.assignedSlot.floorName}</strong>.<br>
-          <button class="btn-primary" style="margin-top: 12px; padding: 8px 16px; font-size: 12px; display: inline-flex;" id="btnSwitchToAssigned">
-            Switch to ${activeSession.assignedSlot.floorName} to view path
-          </button>
-        </div>
-      `;
-      document.getElementById('btnSwitchToAssigned').addEventListener('click', () => {
-        const assignedBlock = activeSession.assignedSlot.block;
-        const targetTab = document.querySelector(`.block-tab[data-block="${assignedBlock}"]`);
-        if (targetTab) targetTab.click();
-      });
-    }
-  } else {
-    if (directionsContainer) directionsContainer.classList.add('hidden');
-  }
-}
-
 function findPathBFS(gridRows, gridCols, start, target, slotMap) {
   const queue = [[start]];
   const visited = new Set();
