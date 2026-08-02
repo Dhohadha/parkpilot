@@ -105,7 +105,7 @@ async function handleCheckIn() {
     const checkInDate = new Date(data.session.checkInTime);
     document.getElementById('passEntryTime').innerText = checkInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // Robust Exit QR Code Generator (Canvas + Image Fallback)
+    // Render Exit Pass QR Code
     generateExitPassQR(data.session.qrToken);
 
     startLiveTimer(checkInDate);
@@ -120,43 +120,20 @@ async function handleCheckIn() {
   }
 }
 
-// Fail-proof Exit Pass QR Code Generator
+// Generate Exit Pass QR on Page
 function generateExitPassQR(qrToken) {
   const qrCanvas = document.getElementById('qrCanvas');
-  const qrFallbackImg = document.getElementById('qrFallbackImg');
+  if (!qrCanvas) return;
 
-  try {
-    if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
-      QRCode.toCanvas(qrCanvas, qrToken, {
-        width: 95,
-        margin: 1,
-        color: { dark: '#0f172a', light: '#ffffff' }
-      }, (err) => {
-        if (err) {
-          console.warn('[QR Canvas Warning] Canvas render error, using image fallback:', err);
-          renderFallbackQRImage(qrToken);
-        } else {
-          qrCanvas.style.display = 'block';
-          qrFallbackImg.style.display = 'none';
-        }
-      });
-    } else {
-      renderFallbackQRImage(qrToken);
-    }
-  } catch (e) {
-    renderFallbackQRImage(qrToken);
+  if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+    QRCode.toCanvas(qrCanvas, qrToken, {
+      width: 95,
+      margin: 1,
+      color: { dark: '#0f172a', light: '#ffffff' }
+    }, function(err) {
+      if (err) console.error('[QR Generation Error]', err);
+    });
   }
-}
-
-function renderFallbackQRImage(qrToken) {
-  const qrCanvas = document.getElementById('qrCanvas');
-  const qrFallbackImg = document.getElementById('qrFallbackImg');
-  
-  // Use high reliability QR API endpoint fallback
-  const fallbackUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrToken)}`;
-  qrFallbackImg.src = fallbackUrl;
-  qrFallbackImg.style.display = 'block';
-  qrCanvas.style.display = 'none';
 }
 
 function renderBlueprintGrid() {
@@ -219,94 +196,112 @@ function startLiveTimer(checkInDate) {
   }, 1000);
 }
 
-// Download Crisp Clean White Parking Pass PNG
-function downloadPassPNG() {
+// 100% Reliable PNG Exporter (In-Memory Direct QR Rendering)
+async function downloadPassPNG() {
   if (!activeSession) return;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = 600;
-  canvas.height = 700;
-  const ctx = canvas.getContext('2d');
+  const btn = document.getElementById('btnDownloadPass');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating PNG...';
 
-  // Pure White Clean Card Background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, 600, 700);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 700;
+    const ctx = canvas.getContext('2d');
 
-  // Border & Header
-  ctx.strokeStyle = '#e2e8f0';
-  ctx.lineWidth = 4;
-  ctx.strokeRect(10, 10, 580, 680);
+    // 1. Pure White Card Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 600, 700);
 
-  // Royal Blue Brand Accent Bar
-  ctx.fillStyle = '#2563eb';
-  ctx.fillRect(40, 40, 520, 60);
+    // 2. Card Outer Border
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(10, 10, 580, 680);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 24px sans-serif';
-  ctx.fillText('PARKPILOT PARKING PASS', 60, 78);
+    // 3. Royal Blue Header Bar
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(40, 40, 520, 60);
 
-  // Assigned Slot Box
-  ctx.fillStyle = '#eff6ff';
-  ctx.fillRect(40, 130, 260, 160);
-  ctx.strokeStyle = '#2563eb';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(40, 130, 260, 160);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px Inter, sans-serif';
+    ctx.fillText('PARKPILOT PARKING PASS', 60, 78);
 
-  ctx.fillStyle = '#64748b';
-  ctx.font = 'bold 12px sans-serif';
-  ctx.fillText('ASSIGNED SLOT', 60, 160);
+    // 4. Assigned Slot Box
+    ctx.fillStyle = '#eff6ff';
+    ctx.fillRect(40, 130, 260, 160);
+    ctx.strokeStyle = '#2563eb';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(40, 130, 260, 160);
 
-  ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 52px sans-serif';
-  ctx.fillText(activeSession.assignedSlot.slotNumber, 60, 225);
+    ctx.fillStyle = '#64748b';
+    ctx.font = 'bold 12px Inter, sans-serif';
+    ctx.fillText('ASSIGNED SLOT', 60, 160);
 
-  ctx.fillStyle = '#2563eb';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText(activeSession.assignedSlot.floorName, 60, 260);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 52px Inter, sans-serif';
+    ctx.fillText(activeSession.assignedSlot.slotNumber, 60, 225);
 
-  // Draw QR Code
-  const qrCanvas = document.getElementById('qrCanvas');
-  const qrFallbackImg = document.getElementById('qrFallbackImg');
+    ctx.fillStyle = '#2563eb';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText(activeSession.assignedSlot.floorName, 60, 260);
 
-  if (qrCanvas && qrCanvas.style.display !== 'none') {
-    ctx.drawImage(qrCanvas, 340, 130, 180, 180);
-  } else if (qrFallbackImg && qrFallbackImg.src) {
-    ctx.drawImage(qrFallbackImg, 340, 130, 180, 180);
+    // 5. Render QR Code directly onto canvas synchronously
+    const tempQrCanvas = document.createElement('canvas');
+    if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
+      await QRCode.toCanvas(tempQrCanvas, activeSession.session.qrToken, {
+        width: 180,
+        margin: 1,
+        color: { dark: '#0f172a', light: '#ffffff' }
+      });
+      ctx.drawImage(tempQrCanvas, 340, 130, 180, 180);
+    }
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '12px Inter, sans-serif';
+    ctx.fillText('SCAN FOR EXIT GATE RELEASE', 335, 335);
+
+    // 6. Session Details
+    ctx.font = '16px Inter, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('Vehicle Plate:', 40, 380);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText(activeSession.session.vehicleNumber, 180, 380);
+
+    ctx.font = '16px Inter, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('Session ID:', 40, 420);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText(activeSession.session.sessionId, 180, 420);
+
+    ctx.font = '16px Inter, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText('Entry Time:', 40, 460);
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText(new Date(activeSession.session.checkInTime).toLocaleString(), 180, 460);
+
+    ctx.fillStyle = '#10b981';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.fillText('✓ Validated Dynamic QR Pass', 40, 630);
+
+    // 7. Trigger Direct File Download
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `ParkPilot_Pass_${activeSession.assignedSlot.slotNumber}.png`;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+  } catch (err) {
+    console.error('[Download PNG Error]', err);
+    alert('Failed to generate PNG. Please try again.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
   }
-
-  ctx.fillStyle = '#64748b';
-  ctx.font = '12px sans-serif';
-  ctx.fillText('SCAN FOR EXIT GATE RELEASE', 335, 335);
-
-  // Session Info Grid
-  ctx.font = '16px sans-serif';
-  ctx.fillStyle = '#64748b';
-  ctx.fillText('Vehicle Plate:', 40, 380);
-  ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText(activeSession.session.vehicleNumber, 180, 380);
-
-  ctx.font = '16px sans-serif';
-  ctx.fillStyle = '#64748b';
-  ctx.fillText('Session ID:', 40, 420);
-  ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText(activeSession.session.sessionId, 180, 420);
-
-  ctx.font = '16px sans-serif';
-  ctx.fillStyle = '#64748b';
-  ctx.fillText('Entry Time:', 40, 460);
-  ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText(new Date(activeSession.session.checkInTime).toLocaleString(), 180, 460);
-
-  // Security Note
-  ctx.fillStyle = '#10b981';
-  ctx.font = 'bold 16px sans-serif';
-  ctx.fillText('✓ Validated Dynamic QR Pass', 40, 630);
-
-  const link = document.createElement('a');
-  link.download = `ParkPilot_Pass_${activeSession.assignedSlot.slotNumber}.png`;
-  link.href = canvas.toDataURL('image/png');
-  link.click();
 }
