@@ -196,7 +196,7 @@ function startLiveTimer(checkInDate) {
   }, 1000);
 }
 
-// 100% Reliable PNG Exporter (In-Memory Direct QR Rendering)
+// 100% Mobile & Desktop Reliable PNG Exporter (Blob + onload)
 async function downloadPassPNG() {
   if (!activeSession) return;
 
@@ -225,7 +225,7 @@ async function downloadPassPNG() {
     ctx.fillRect(40, 40, 520, 60);
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 24px Inter, sans-serif';
+    ctx.font = 'bold 24px sans-serif';
     ctx.fillText('PARKPILOT PARKING PASS', 60, 78);
 
     // 4. Assigned Slot Box
@@ -236,72 +236,106 @@ async function downloadPassPNG() {
     ctx.strokeRect(40, 130, 260, 160);
 
     ctx.fillStyle = '#64748b';
-    ctx.font = 'bold 12px Inter, sans-serif';
+    ctx.font = 'bold 12px sans-serif';
     ctx.fillText('ASSIGNED SLOT', 60, 160);
 
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 52px Inter, sans-serif';
+    ctx.font = 'bold 52px sans-serif';
     ctx.fillText(activeSession.assignedSlot.slotNumber, 60, 225);
 
     ctx.fillStyle = '#2563eb';
-    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.fillText(activeSession.assignedSlot.floorName, 60, 260);
 
-    // 5. Render QR Code directly onto canvas synchronously
-    const tempQrCanvas = document.createElement('canvas');
-    if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
-      await QRCode.toCanvas(tempQrCanvas, activeSession.session.qrToken, {
-        width: 180,
-        margin: 1,
-        color: { dark: '#0f172a', light: '#ffffff' }
-      });
-      ctx.drawImage(tempQrCanvas, 340, 130, 180, 180);
-    }
-
-    ctx.fillStyle = '#64748b';
-    ctx.font = '12px Inter, sans-serif';
-    ctx.fillText('SCAN FOR EXIT GATE RELEASE', 335, 335);
-
-    // 6. Session Details
-    ctx.font = '16px Inter, sans-serif';
+    // 5. Session Details
+    ctx.font = '16px sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.fillText('Vehicle Plate:', 40, 380);
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.fillText(activeSession.session.vehicleNumber, 180, 380);
 
-    ctx.font = '16px Inter, sans-serif';
+    ctx.font = '16px sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.fillText('Session ID:', 40, 420);
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.fillText(activeSession.session.sessionId, 180, 420);
 
-    ctx.font = '16px Inter, sans-serif';
+    ctx.font = '16px sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.fillText('Entry Time:', 40, 460);
     ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.fillText(new Date(activeSession.session.checkInTime).toLocaleString(), 180, 460);
 
     ctx.fillStyle = '#10b981';
-    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.font = 'bold 16px sans-serif';
     ctx.fillText('✓ Validated Dynamic QR Pass', 40, 630);
 
-    // 7. Trigger Direct File Download
-    const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `ParkPilot_Pass_${activeSession.assignedSlot.slotNumber}.png`;
-    link.href = dataUrl;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    ctx.fillStyle = '#64748b';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('SCAN FOR EXIT GATE RELEASE', 335, 335);
+
+    // 6. Generate QR Data URL & draw onto canvas asynchronously
+    QRCode.toDataURL(activeSession.session.qrToken, {
+      width: 180,
+      margin: 1,
+      color: { dark: '#0f172a', light: '#ffffff' }
+    }, (qrErr, qrDataUrl) => {
+      if (qrErr || !qrDataUrl) {
+        console.error('QR DataURL error:', qrErr);
+        triggerBlobDownload(canvas, btn, originalText);
+        return;
+      }
+
+      const qrImg = new Image();
+      qrImg.onload = () => {
+        ctx.drawImage(qrImg, 340, 130, 180, 180);
+        triggerBlobDownload(canvas, btn, originalText);
+      };
+      qrImg.onerror = () => {
+        triggerBlobDownload(canvas, btn, originalText);
+      };
+      qrImg.src = qrDataUrl;
+    });
 
   } catch (err) {
     console.error('[Download PNG Error]', err);
-    alert('Failed to generate PNG. Please try again.');
-  } finally {
     btn.disabled = false;
     btn.innerHTML = originalText;
+    alert('Failed to generate PNG. Please try again.');
+  }
+}
+
+function triggerBlobDownload(canvas, btn, originalText) {
+  try {
+    canvas.toBlob((blob) => {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+
+      if (!blob) {
+        alert('Could not generate PNG image.');
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `ParkPilot_Pass_${activeSession ? activeSession.assignedSlot.slotNumber : 'Pass'}.png`;
+      link.href = url;
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        URL.revokeObjectURL(url);
+      }, 1000);
+    }, 'image/png');
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+    alert('Download failed: ' + e.message);
   }
 }
