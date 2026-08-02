@@ -46,6 +46,7 @@ async function fetchLotInfo() {
 
     if (data.success) {
       currentLot = data.lot;
+      currentLot.floors = data.floors;
       document.getElementById('statAvailable').innerText = data.lot.availableSlots;
       document.getElementById('statTotal').innerText = data.lot.totalSlots;
       document.getElementById('statFloors').innerText = data.floors.length;
@@ -53,6 +54,7 @@ async function fetchLotInfo() {
       if (socket && currentLot) {
         socket.emit('join_lot', currentLot.id);
       }
+      renderBlueprintGrid();
     }
   } catch (err) {
     console.error('Error fetching lot info:', err);
@@ -149,8 +151,11 @@ async function handleCheckIn() {
   }
 }
 
-function displaySessionPass(data, triggerAutoDownload = false) {
+async function displaySessionPass(data, triggerAutoDownload = false) {
   activeSession = data;
+  if (!currentLot || !currentLot.floors) {
+    await fetchLotInfo();
+  }
 
   document.getElementById('stepCheckIn').classList.remove('active');
   document.getElementById('stepPassView').classList.add('active');
