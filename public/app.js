@@ -51,7 +51,7 @@ async function fetchLotInfo() {
 
 function setupEventListeners() {
   document.getElementById('btnCheckIn').addEventListener('click', handleCheckIn);
-  document.getElementById('btnDownloadPass').addEventListener('click', downloadPassPNG);
+  document.getElementById('btnDownloadPass').addEventListener('click', () => downloadPassPNG());
 
   document.getElementById('btnToggleMap').addEventListener('click', () => {
     document.getElementById('blueprintContainer').scrollIntoView({ behavior: 'smooth' });
@@ -110,6 +110,11 @@ async function handleCheckIn() {
 
     startLiveTimer(checkInDate);
     renderBlueprintGrid();
+
+    // AUTO-DOWNLOAD PARKING PASS PNG IMMEDIATELY ON ALLOCATION!
+    setTimeout(() => {
+      downloadPassPNG();
+    }, 400);
 
   } catch (error) {
     errBox.innerText = error.message;
@@ -196,14 +201,16 @@ function startLiveTimer(checkInDate) {
   }, 1000);
 }
 
-// 100% Mobile & Desktop Reliable PNG Exporter (Blob + onload)
+// 100% Mobile & Desktop Reliable PNG Exporter (Blob + Auto-Download)
 async function downloadPassPNG() {
   if (!activeSession) return;
 
   const btn = document.getElementById('btnDownloadPass');
-  const originalText = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating PNG...';
+  const originalText = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Downloading Pass...';
+  }
 
   try {
     const canvas = document.createElement('canvas');
@@ -284,7 +291,6 @@ async function downloadPassPNG() {
       color: { dark: '#0f172a', light: '#ffffff' }
     }, (qrErr, qrDataUrl) => {
       if (qrErr || !qrDataUrl) {
-        console.error('QR DataURL error:', qrErr);
         triggerBlobDownload(canvas, btn, originalText);
         return;
       }
@@ -302,22 +308,22 @@ async function downloadPassPNG() {
 
   } catch (err) {
     console.error('[Download PNG Error]', err);
-    btn.disabled = false;
-    btn.innerHTML = originalText;
-    alert('Failed to generate PNG. Please try again.');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
   }
 }
 
 function triggerBlobDownload(canvas, btn, originalText) {
   try {
     canvas.toBlob((blob) => {
-      btn.disabled = false;
-      btn.innerHTML = originalText;
-
-      if (!blob) {
-        alert('Could not generate PNG image.');
-        return;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
       }
+
+      if (!blob) return;
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -334,8 +340,9 @@ function triggerBlobDownload(canvas, btn, originalText) {
       }, 1000);
     }, 'image/png');
   } catch (e) {
-    btn.disabled = false;
-    btn.innerHTML = originalText;
-    alert('Download failed: ' + e.message);
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
   }
 }
