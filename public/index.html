@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ParkPilot – Smart QR Parking Check-In</title>
+
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- QRCode & Socket.IO client -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- HEADER (Driver Only) -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-square-parking"></i>
+        </div>
+        <div class="brand-text">
+          <h1>ParkPilot</h1>
+          <span class="brand-subtitle">Smart QR Parking</span>
+        </div>
+      </div>
+      <div style="font-size: 11px; font-weight: 700; color: #10b981; background: #ecfdf5; border: 1px solid #10b981; padding: 4px 10px; border-radius: 20px;">
+        <i class="fa-solid fa-circle" style="font-size: 8px;"></i> LIVE
+      </div>
+    </header>
+
+    <!-- STEP 1: CHECK-IN FORM -->
+    <main id="stepCheckIn" class="step-card active">
+      <div class="hero-section">
+        <div class="hero-icon">
+          <i class="fa-solid fa-car"></i>
+        </div>
+        <h2>Scan & Instant Park</h2>
+        <p>Scan entrance QR code to automatically allocate your nearest parking slot.</p>
+      </div>
+
+      <div class="form-group">
+        <label for="vehicleInput"><i class="fa-solid fa-id-card"></i> Vehicle License Plate (Optional)</label>
+        <div class="input-wrapper">
+          <input type="text" id="vehicleInput" placeholder="e.g. SPARK-2026" maxlength="12" value="SPARK-2026">
+        </div>
+      </div>
+
+      <!-- Quick Occupancy Summary -->
+      <div class="stats-summary">
+        <div class="stat-item">
+          <span class="stat-val" id="statAvailable">--</span>
+          <span class="stat-lbl">Slots Free</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-val" id="statTotal">--</span>
+          <span class="stat-lbl">Total Capacity</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span class="stat-val" id="statFloors">3</span>
+          <span class="stat-lbl">Levels</span>
+        </div>
+      </div>
+
+      <button id="btnCheckIn" class="btn-primary">
+        <span>Allocate Nearest Available Slot</span>
+        <i class="fa-solid fa-arrow-right"></i>
+      </button>
+
+      <div id="checkInError" class="alert alert-error hidden"></div>
+    </main>
+
+    <!-- STEP 2: PARKING PASS & BLUEPRINT MAP -->
+    <main id="stepPassView" class="step-card">
+
+      <!-- DIGITAL PARKING PASS CARD -->
+      <div class="parking-pass-card" id="passCardElement">
+        <div class="pass-header">
+          <div class="pass-title">
+            <i class="fa-solid fa-parking"></i>
+            <span>PARKPILOT PASS</span>
+          </div>
+          <span class="pass-status-tag">ACTIVE SESSION</span>
+        </div>
+
+        <div class="pass-main">
+          <div class="pass-slot-box">
+            <span class="slot-label">YOUR ASSIGNED SLOT</span>
+            <div class="slot-number-display" id="passSlotNum">B1-04</div>
+            <span class="slot-floor-display" id="passFloorNum">Basement Level 1</span>
+          </div>
+
+          <div class="pass-qr-box">
+            <canvas id="qrCanvas" style="width: 95px; height: 95px;"></canvas>
+            <img id="qrFallbackImg" style="width: 95px; height: 95px; display: none; border-radius: 4px;" alt="Exit QR Code" />
+            <span class="qr-subtext">Scan at gate exit</span>
+          </div>
+        </div>
+
+        <div class="pass-details-grid">
+          <div class="pdetail">
+            <span class="pdetail-lbl"><i class="fa-solid fa-car"></i> Vehicle Plate</span>
+            <span class="pdetail-val" id="passVehicle">SPARK-2026</span>
+          </div>
+          <div class="pdetail">
+            <span class="pdetail-lbl"><i class="fa-solid fa-clock"></i> Entry Time</span>
+            <span class="pdetail-val" id="passEntryTime">12:30 PM</span>
+          </div>
+          <div class="pdetail">
+            <span class="pdetail-lbl"><i class="fa-solid fa-stopwatch"></i> Parking Duration</span>
+            <span class="pdetail-val highlight-timer" id="passTimer">00:00:00</span>
+          </div>
+          <div class="pdetail">
+            <span class="pdetail-lbl"><i class="fa-solid fa-ticket"></i> Session ID</span>
+            <span class="pdetail-val" id="passSessionId">PS-9481</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTION BUTTONS -->
+      <div class="pass-actions" style="display: flex; flex-direction: column; gap: 10px;">
+        <button id="btnDownloadPass" class="btn-primary">
+          <i class="fa-solid fa-download"></i> Save Parking Pass (PNG)
+        </button>
+        <button id="btnToggleMap" class="btn-secondary">
+          <i class="fa-solid fa-map"></i> View Blueprint & Path
+        </button>
+      </div>
+
+      <!-- INTERACTIVE UNDERGROUND BLUEPRINT SECTION -->
+      <section class="blueprint-section" id="blueprintContainer">
+        <div class="blueprint-header">
+          <h3>Facility Blueprint Map</h3>
+          <span class="blueprint-floor-tag" id="currentFloorTag">Floor: B1</span>
+        </div>
+
+        <!-- Map Legend -->
+        <div class="blueprint-legend">
+          <div class="leg-item"><span class="leg-box green"></span> Available</div>
+          <div class="leg-item"><span class="leg-box red"></span> Occupied</div>
+          <div class="leg-item"><span class="leg-box blue"></span> Your Slot</div>
+        </div>
+
+        <!-- Blueprint Grid Viewport -->
+        <div class="blueprint-map-viewport">
+          <div class="blueprint-grid" id="blueprintGrid"></div>
+        </div>
+      </section>
+
+      <button id="btnNewCheckIn" class="btn-link">
+        <i class="fa-solid fa-arrows-rotate"></i> Start New Check-In
+      </button>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <p>ParkPilot Smart QR Parking System</p>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

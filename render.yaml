@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: parkpilot-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGO_URI
+        value: mongodb+srv://vasadipavan1221_db_user:parkpilot@cluster0.dga8ndm.mongodb.net/parkpilot?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        value: parkpilot_jwt_secret_sparktank_2026
+      - key: QR_SECRET
+        value: parkpilot_qr_secret_sparktank_2026
