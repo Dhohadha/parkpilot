@@ -75,7 +75,8 @@ exports.checkIn = async (req, res) => {
           sessionId: existingSession.sessionId,
           vehicleNumber: existingSession.vehicleNumber,
           checkInTime: existingSession.checkInTime,
-          qrToken: existingSession.qrToken
+          qrToken: existingSession.qrToken,
+          qrDataUrl: await QRCode.toDataURL(existingSession.qrToken, { margin: 1, color: { dark: '#0f172a', light: '#ffffff' } })
         },
         lot: {
           code: lot.code,
@@ -148,7 +149,8 @@ exports.checkIn = async (req, res) => {
         sessionId: session.sessionId,
         vehicleNumber: session.vehicleNumber,
         checkInTime: session.checkInTime,
-        qrToken: session.qrToken
+        qrToken: session.qrToken,
+        qrDataUrl: await QRCode.toDataURL(session.qrToken, { margin: 1, color: { dark: '#0f172a', light: '#ffffff' } })
       },
       lot: {
         code: lot.code,
@@ -199,6 +201,7 @@ exports.getSessionStatus = async (req, res) => {
         vehicleNumber: session.vehicleNumber,
         checkInTime: session.checkInTime,
         qrToken: session.qrToken,
+        qrDataUrl: await QRCode.toDataURL(session.qrToken, { margin: 1, color: { dark: '#0f172a', light: '#ffffff' } }),
         status: session.status
       },
       lot: {

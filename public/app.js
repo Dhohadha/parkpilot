@@ -153,8 +153,11 @@ function displaySessionPass(data, triggerAutoDownload = false) {
   const checkInDate = new Date(data.session.checkInTime);
   document.getElementById('passEntryTime').innerText = checkInDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Render Exit Pass QR Code
-  generateExitPassQR(data.session.qrToken);
+  // Render Exit Pass QR Code using pre-generated server DataURL
+  const qrImgEl = document.getElementById('qrImg');
+  if (qrImgEl && data.session.qrDataUrl) {
+    qrImgEl.src = data.session.qrDataUrl;
+  }
 
   startLiveTimer(checkInDate);
   renderBlueprintGrid();
@@ -166,21 +169,6 @@ function displaySessionPass(data, triggerAutoDownload = false) {
   }
 }
 
-// Generate Exit Pass QR on Page
-function generateExitPassQR(qrToken) {
-  const qrCanvas = document.getElementById('qrCanvas');
-  if (!qrCanvas) return;
-
-  if (typeof QRCode !== 'undefined' && QRCode.toCanvas) {
-    QRCode.toCanvas(qrCanvas, qrToken, {
-      width: 95,
-      margin: 1,
-      color: { dark: '#0f172a', light: '#ffffff' }
-    }, function(err) {
-      if (err) console.error('[QR Generation Error]', err);
-    });
-  }
-}
 
 function renderBlueprintGrid() {
   if (!activeSession || !activeSession.blueprint) return;
@@ -325,27 +313,16 @@ async function downloadPassPNG() {
     ctx.font = '12px sans-serif';
     ctx.fillText('SCAN FOR EXIT GATE RELEASE', 335, 335);
 
-    // 6. Generate QR Data URL & draw onto canvas asynchronously
-    QRCode.toDataURL(activeSession.session.qrToken, {
-      width: 180,
-      margin: 1,
-      color: { dark: '#0f172a', light: '#ffffff' }
-    }, (qrErr, qrDataUrl) => {
-      if (qrErr || !qrDataUrl) {
-        triggerBlobDownload(canvas, btn, originalText);
-        return;
-      }
-
-      const qrImg = new Image();
-      qrImg.onload = () => {
-        ctx.drawImage(qrImg, 340, 130, 180, 180);
-        triggerBlobDownload(canvas, btn, originalText);
-      };
-      qrImg.onerror = () => {
-        triggerBlobDownload(canvas, btn, originalText);
-      };
-      qrImg.src = qrDataUrl;
-    });
+    // 6. Draw Pre-generated QR Data URL onto canvas asynchronously
+    const qrImg = new Image();
+    qrImg.onload = () => {
+      ctx.drawImage(qrImg, 340, 130, 180, 180);
+      triggerBlobDownload(canvas, btn, originalText);
+    };
+    qrImg.onerror = () => {
+      triggerBlobDownload(canvas, btn, originalText);
+    };
+    qrImg.src = activeSession.session.qrDataUrl;
 
   } catch (err) {
     console.error('[Download PNG Error]', err);
