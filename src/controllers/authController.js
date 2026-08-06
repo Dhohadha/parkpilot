@@ -1,6 +1,7 @@
 const AdminUser = require('../models/AdminUser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const firebaseService = require('../services/firebaseService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'parkpilot_jwt_secret_sparktank_2026';
 
@@ -83,5 +84,62 @@ exports.getMe = async (req, res) => {
     return res.json({ success: true, user });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Firebase Login / Google Login
+exports.firebaseLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: 'ID Token is required' });
+    }
+
+    const decoded = await firebaseService.verifyFirebaseToken(idToken);
+    const email = decoded.email ? decoded.email.toLowerCase().trim() : null;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email not found in Firebase token' });
+    }
+
+    // Try to find matching user in Mongoose
+    let user = await AdminUser.findOne({ email }).populate('assignedLotId', 'name code');
+
+    if (!user) {
+      // If user does not exist, we register a new user with 'SecurityGuard' role
+      // We generate a unique username from email
+      const baseUsername = email.split('@')[0];
+      const username = baseUsername + Math.floor(1000 + Math.random() * 9000);
+      user = await AdminUser.create({
+        username,
+        email,
+        role: 'SecurityGuard',
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        assignedLotId: user.assignedLotId ? user.assignedLotId._id : null
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        assignedLot: user.assignedLotId
+      }
+    });
+  } catch (error) {
+    return res.status(401).json({ success: false, message: 'Authentication failed: ' + error.message });
   }
 };

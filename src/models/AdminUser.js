@@ -16,7 +16,7 @@ const AdminUserSchema = new mongoose.Schema({
   },
   passwordHash: {
     type: String,
-    required: true
+    required: false
   },
   role: {
     type: String,
